@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+option go_package = "./pb";
+import "google/protobuf/timestamp.proto";
+
+package moviebase;
+
+service UserService {
+    rpc CreateUsers(stream CreateUserRequest) returns (CreateUsersResponse) {}
+    rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
+}
+
+service CategoryService {
+    rpc CreateCategories(stream CreateCategoryRequest) returns (CreateCategoriesResponse) {}
+}
+
+service MovieService {
+    rpc CreateMovies(stream CreateMovieRequest) returns (CreateMoviesResponse) {}
+    rpc GetMoviesByUserIDAndCategoryID(GetMoviesRequest) returns (stream GetMoviesResponse) {}
+    rpc GetMoviesByUserID(GetMoviesRequestByUserIDOnly) returns (stream GetMoviesResponseByUserIDOnly) {}
+    rpc GetMoviesByUserIDAndName(GetMoviesRequestByUserIDAndName) returns (stream GetMoviesResponseByUserIDAndName) {}
+    rpc GetMoviesByUserIDAndCategoryIDByCreatedAt(GetMoviesRequestByUserIDAndCategoryIDByCreatedAt) returns (stream GetMoviesResponseByUserIDAndCategoryIDByCreatedAt) {}
+}
+
+message GetMoviesRequestByUserIDAndName {
+    string user_id = 1;
+    string name = 2;
+    int32 page_size = 3;
+    bytes paging_state = 4; 
+}
+
+message GetMoviesRequestByUserIDAndCategoryIDByCreatedAt {
+    string user_id = 1;
+    string category_id = 2;
+    google.protobuf.Timestamp start_date = 3;
+    google.protobuf.Timestamp end_date = 4;  // Fixed the tag number to 4
+    int32 page_size = 5;
+    bytes paging_state = 6;
+}
+
+message GetMoviesResponseByUserIDAndCategoryIDByCreatedAt {
+    repeated MovieResponse movies = 1;
+    string message = 2;
+    bytes paging_state = 3;
+}
+
+message GetMoviesResponseByUserIDAndName {
+    repeated MovieResponse movies = 1;
+    string message = 2;
+    bytes paging_state = 3;
+}
+
+message GetMoviesRequestByUserIDOnly {
+    string user_id = 1;
+    int32 page_size = 2;
+    bytes paging_state = 3;
+}
+
+message GetMoviesResponseByUserIDOnly {
+    repeated MovieResponse movies = 1;
+    string message = 2;
+    bytes paging_state = 3;
+}
+
+message GetUserRequest {
+    string id = 1;
+}
+
+message GetUserResponse {
+    string id = 1;
+    string name = 2;
+    string alias_name = 3;
+}
+
+message CreateMovieRequest {
+    string user_id = 1;
+    string category_id = 2;
+    string name = 3;
+    string banner_url = 4;
+    string movie_url = 5;
+    string description = 6;
+}
+
+message GetMoviesRequest {
+    string user_id = 1;
+    string category_id = 2;
+}
+
+message GetMoviesResponse {
+    repeated MovieResponse movies = 1;
+    string message = 2;
+}
+
+message MovieResponse {
+    string user_id = 1;
+    string movie_id = 2;
+    string category_id = 3;
+    string name = 4;
+    string banner_url = 5;
+    string movie_url = 6;
+    string description = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+}
+
+message CreateMoviesResponse {
+    repeated MovieResponse movies = 1;
+    string message = 2;
+}
+
+message CreateUserRequest {
+    string name = 1;
+    string alias_name = 2;
+}
+
+message CreateUsersResponse {
+    string message = 1;
+    int32 no_created_users = 2;
+}
+
+message CreateCategoryRequest {
+    string name = 1;
+    string description = 2;
+}
+
+message CreateCategoriesResponse {
+    string message = 1;
+    int32 no_created_categories = 2;
+}
