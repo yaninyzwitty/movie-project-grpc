@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -18,7 +17,7 @@ type AstraConfig struct {
 }
 
 type AstraDb interface {
-	CreateDBConn(ctx context.Context, config *AstraConfig) (*gocql.Session, error)
+	CreateDBConn(config *AstraConfig) (*gocql.Session, error)
 }
 
 type astradb struct{}
@@ -27,7 +26,7 @@ func NewAstraDb() AstraDb {
 	return &astradb{}
 }
 
-func (a *astradb) CreateDBConn(ctx context.Context, config *AstraConfig) (*gocql.Session, error) {
+func (a *astradb) CreateDBConn(config *AstraConfig) (*gocql.Session, error) {
 	// initialize cluster
 	cluster, err := gocqlastra.NewClusterFromBundle(config.Path, config.Username, config.Password, config.Timeout)
 	if err != nil {
