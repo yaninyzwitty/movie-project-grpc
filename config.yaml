@@ -1,0 +1,7 @@
+server:
+  port: 50051
+  timeout: 20s
+database:
+  path: ./secure-connect.zip
+  username: token
+  
