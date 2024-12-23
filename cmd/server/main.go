@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/yaninyzwitty/movie-project-grpc/internal/database"
 	"github.com/yaninyzwitty/movie-project-grpc/internal/database/pkg"
 )
@@ -25,11 +26,18 @@ func main() {
 		slog.Error("failed to load config file", "error", err)
 		os.Exit(1)
 	}
+	// you dont require godotenv.Load() here when using docker and docker compose
+	err = godotenv.Load()
+	if err != nil {
+		slog.Error("failed to load .env file", "value", err)
+
+	}
 
 	if password := os.Getenv("ASTRA_DB_PASSWORD"); password != "" {
 		s = password
 
 	}
+
 	_, cancel := context.WithTimeout(context.Background(), cfg.Server.Timeout)
 	defer cancel()
 	astraConn := database.NewAstraDb()
