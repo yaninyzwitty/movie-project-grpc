@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY,
     name TEXT,
     description TEXT
-)
+);
 
 CREATE TABLE IF NOT EXISTS movies_by_user (
     user_id UUID,
@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS movies_by_user (
     name TEXT,
     banner_url TEXT,
     movie_url TEXT,
-    description TEXT,
+    description TEXT,  
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
     PRIMARY KEY ((user_id), category_id, created_at, movie_id)
-) WITH CLUSTERING ORDER BY (created_at DESC, movie_id ASC);
+) WITH CLUSTERING ORDER BY (category_id ASC, created_at DESC, movie_id ASC);
