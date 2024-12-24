@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/yaninyzwitty/movie-project-grpc/internal/database/pkg"
+	"github.com/yaninyzwitty/movie-project-grpc/internal/helpers"
 	"github.com/yaninyzwitty/movie-project-grpc/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -53,5 +56,59 @@ func main() {
 
 	slog.Info("user", "val", res.Name)
 	slog.Info("Alias name", "val", res.AliasName)
+
+	// read users.json file
+	users, err := os.ReadFile("users.json")
+	if err != nil {
+		slog.Error("failed to read file", "error", err)
+		os.Exit(1)
+	}
+
+	// create user stream
+	stream, err := userClient.CreateUsers(ctx)
+	if err != nil {
+		slog.Error("failed to create user stream", "error", err)
+		os.Exit(1)
+	}
+
+	// unmarshal users.json data into a slice of Person
+	var persons []helpers.Person
+	if err := json.Unmarshal(users, &persons); err != nil {
+		slog.Error("failed to unmarshal users", "error", err)
+		os.Exit(1)
+	}
+
+	// use a wait group to wait all go routines to finish
+	var wg sync.WaitGroup
+	// make a channel to send errors
+	errChan := make(chan error, 1)
+	// then we create users concurrently
+	for index, person := range persons {
+		wg.Add(1)
+		go helpers.CreateUser(index, person, stream, &wg, errChan)
+
+	}
+	wg.Wait()
+	// Check if there was an error while sending users
+	select {
+	case err := <-errChan:
+		if err != nil {
+			slog.Error("failed to send user", "error", err)
+			os.Exit(1)
+		}
+	default:
+		if err := stream.CloseSend(); err != nil {
+			slog.Error("failed to close stream", "error", err)
+			os.Exit(1)
+		}
+		// Wait for the server response
+		response, err := stream.CloseAndRecv()
+		if err != nil {
+			slog.Error("failed to receive response", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("Users created successfully", "message", response.GetMessage())
+
+	}
 
 }
