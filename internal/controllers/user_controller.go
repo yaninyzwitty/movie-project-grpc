@@ -23,7 +23,7 @@ func NewUserController(session *gocql.Session) *UserController {
 
 func (c *UserController) CreateUsers(stream pb.UserService_CreateUsersServer) error {
 	// Prepare the Cassandra statement
-	insertStmt := `INSERT INTO users (id, name, alias_name) VALUES (?, ?, ?)`
+	insertStmt := `INSERT INTO movie_db.users (id, name, alias_name) VALUES (?, ?, ?)`
 	batch := c.session.NewBatch(gocql.UnloggedBatch) // Use unlogged batch for efficiency
 
 	totalUsersCreated := 0
@@ -78,7 +78,7 @@ func (c *UserController) GetUser(ctx context.Context, req *pb.GetUserRequest) (*
 		return nil, status.Errorf(codes.Internal, "Error inserting batch: %v", err)
 	}
 
-	stmt := `SELECT name, alias_name FROM users WHERE id = ?`
+	stmt := `SELECT name, alias_name FROM movie_db.users WHERE id = ?`
 	var name, aliasName string
 	if err := c.session.Query(stmt, userID).Scan(&name, &aliasName); err != nil {
 
