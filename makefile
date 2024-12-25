@@ -3,8 +3,8 @@ generate:
 
 commands:
 	grpcurl -d @ -proto proto\movie_proto.proto -import-path ./ -plaintext localhost:50051 moviebase.UserService/CreateUsers < create_users.json 
-	# getting single user
+	# getting single user with grpcurl and cmd
 	
-	grpcurl -d "{\"id\": \"248f8388-c217-11ef-93ca-54ee756d8952\"}" -proto proto\movie_proto.proto -import-path ./ -plaintext localhost:50051 moviebase.UserService/GetUser
+	grpcurl -d "{\"id\": \"d77ef8ba-c2b1-11ef-900a-54ee756d8952\"}" -proto proto\movie_proto.proto -import-path ./ -plaintext localhost:50051 moviebase.UserService/GetUser
 
 

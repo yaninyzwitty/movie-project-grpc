@@ -47,8 +47,9 @@ func main() {
 
 	// user client service
 	userClient := pb.NewUserServiceClient(conn)
+	categoryClient := pb.NewCategoryServiceClient(conn)
 
-	res, err := userClient.GetUser(ctx, &pb.GetUserRequest{Id: "420ebbc6-c208-11ef-8e78-54ee756d8952"})
+	res, err := userClient.GetUser(ctx, &pb.GetUserRequest{Id: "889a8a7b-c2b1-11ef-9004-54ee756d8952"})
 	if err != nil {
 		slog.Error("failed to get user", "error", err)
 		os.Exit(1)
@@ -110,5 +111,34 @@ func main() {
 		slog.Info("Users created successfully", "message", response.GetMessage())
 
 	}
+
+	categoryStream, err := categoryClient.CreateCategories(ctx)
+	if err != nil {
+		slog.Error("failed to create category stream", "error", err)
+		os.Exit(1)
+	}
+	categories := []pb.CreateCategoryRequest{
+		{Name: "Romance", Description: "Stories of passion and longing"},
+		{Name: "Desire", Description: "Exploring intimate connections"},
+		{Name: "Mystique", Description: "Unveiling secrets and allure"},
+		{Name: "Euphoria", Description: "Moments of pure ecstasy and joy"},
+		{Name: "Seduction", Description: "The art of charm and temptation"},
+		{Name: "Whispers", Description: "Secrets shared in soft tones"},
+		{Name: "Embrace", Description: "Warmth in closeness and affection"},
+	}
+
+	for i := range categories {
+		slog.Info("creating category", "value", categories[i].Name)
+		if err := categoryStream.Send(&categories[i]); err != nil {
+			slog.Error("Error while sending category", "error", err)
+		}
+	}
+
+	categoryResponse, err := categoryStream.CloseAndRecv()
+	if err != nil {
+		slog.Error("Error while receiving response", "error", err)
+	}
+
+	slog.Info("Categories created successfully", "message", categoryResponse.GetMessage())
 
 }
