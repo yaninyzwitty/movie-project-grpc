@@ -8,6 +8,7 @@ import (
 	"github.com/yaninyzwitty/movie-project-grpc/pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type MovieController struct {
@@ -146,6 +147,8 @@ func (c *MovieController) fetchMovies(userID, categoryID gocql.UUID) ([]*pb.Movi
 			BannerUrl:   bannerUrl,
 			MovieUrl:    movieUrl,
 			Description: description,
+			CreatedAt:   timestamppb.New(createdAt),
+			UpdatedAt:   timestamppb.New(updatedAt),
 		})
 	}
 
@@ -154,4 +157,68 @@ func (c *MovieController) fetchMovies(userID, categoryID gocql.UUID) ([]*pb.Movi
 	}
 
 	return movies, nil
+}
+
+func (c *MovieController) GetMoviesByUserIDOnly(req *pb.GetMoviesRequestByUserIDOnly, stream pb.MovieService_GetMoviesByUserIDServer) error {
+	if req.UserId == "" {
+		return status.Errorf(codes.InvalidArgument, "userId cannot be empty")
+	}
+
+	if len(req.PagingState) == 0 {
+		return status.Errorf(codes.InvalidArgument, "pagingState cannot be empty")
+
+	}
+	userID, err := gocql.ParseUUID(req.UserId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid userId format: %v", err)
+	}
+
+	stmt := `SELECT movie_id, category_id, name, banner_url, movie_url, description, created_at, updated_at 
+			FROM movie_db.movies_by_user 
+			WHERE user_id = ?`
+	query := c.session.Query(stmt, userID).PageSize(int(req.PageSize))
+	if len(req.PagingState) > 0 {
+		query = query.PageState(req.PagingState)
+
+	}
+
+	iter := query.Iter()
+	var movies []*pb.MovieResponse
+	var name, bannerURL, movieURL, description string
+	var createdAt, updatedAt time.Time
+	var movieID, categoryID gocql.UUID
+
+	for iter.Scan(&movieID, &categoryID, &name, &bannerURL, &movieURL, &description, &createdAt, &updatedAt) {
+		movies = append(movies, &pb.MovieResponse{
+			MovieId:     movieID.String(),
+			UserId:      userID.String(),
+			CategoryId:  categoryID.String(),
+			Name:        name,
+			BannerUrl:   bannerURL,
+			MovieUrl:    movieURL,
+			CreatedAt:   timestamppb.New(createdAt),
+			UpdatedAt:   timestamppb.New(updatedAt),
+			Description: description,
+		})
+	}
+
+	if err := iter.Close(); err != nil {
+		return status.Errorf(codes.Internal, "failed to close iterator: %v", err)
+
+	}
+	// next paging state
+	pagingState := iter.PageState()
+
+	response := &pb.GetMoviesResponseByUserIDOnly{
+		Movies:      movies,
+		Message:     "Movies retrieved successfully",
+		PagingState: pagingState,
+	}
+
+	if err := stream.Send(response); err != nil {
+		return status.Errorf(codes.Internal, "failed to send response: %v", err)
+	}
+
+	return nil
+
 }
