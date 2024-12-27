@@ -86,3 +86,72 @@ func (c *MovieController) CreateMovies(stream pb.MovieService_CreateMoviesServer
 		Movies:  createdMovies,
 	})
 }
+
+func (c *MovieController) GetMoviesByUserIDAndCategoryID(req *pb.GetMoviesRequest, stream pb.MovieService_GetMoviesByUserIDAndCategoryIDServer) error {
+	// Validate input parameters
+	if req.CategoryId == "" || req.UserId == "" {
+		return status.Errorf(codes.InvalidArgument, "categoryId or userId cannot be empty")
+	}
+
+	categoryID, err := gocql.ParseUUID(req.CategoryId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid categoryId format: %v", err)
+	}
+
+	userID, err := gocql.ParseUUID(req.UserId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid userId format: %v", err)
+	}
+
+	// Query Cassandra for movies
+	movies, err := c.fetchMovies(userID, categoryID)
+	if err != nil {
+		return err
+	}
+
+	// Handle empty results
+	if len(movies) == 0 {
+		return status.Errorf(codes.NotFound, "no movies found for the specified userId and categoryId")
+	}
+
+	// Send the response
+	if err := stream.Send(&pb.GetMoviesResponse{
+		Movies:  movies,
+		Message: "Movies retrieved successfully",
+	}); err != nil {
+		return status.Errorf(codes.Internal, "failed to send response: %v", err)
+	}
+
+	return nil
+}
+
+func (c *MovieController) fetchMovies(userID, categoryID gocql.UUID) ([]*pb.MovieResponse, error) {
+	stmt := `SELECT movie_id, category_id, name, banner_url, movie_url, description, created_at, updated_at FROM movie_db.movies_by_user WHERE user_id = ? AND category_id = ?`
+	query := c.session.Query(stmt, userID, categoryID)
+	iter := query.Iter()
+
+	var movies []*pb.MovieResponse
+	var (
+		movieID, catID                         gocql.UUID
+		name, bannerUrl, movieUrl, description string
+		createdAt, updatedAt                   time.Time
+	)
+
+	for iter.Scan(&movieID, &catID, &name, &bannerUrl, &movieUrl, &description, &createdAt, &updatedAt) {
+		movies = append(movies, &pb.MovieResponse{
+			MovieId:     movieID.String(),
+			UserId:      userID.String(),
+			CategoryId:  categoryID.String(),
+			Name:        name,
+			BannerUrl:   bannerUrl,
+			MovieUrl:    movieUrl,
+			Description: description,
+		})
+	}
+
+	if err := iter.Close(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to close iterator: %v", err)
+	}
+
+	return movies, nil
+}
