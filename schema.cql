@@ -22,3 +22,7 @@ CREATE TABLE IF NOT EXISTS movies_by_user (
     updated_at TIMESTAMP,
     PRIMARY KEY ((user_id), category_id, created_at, movie_id)
 ) WITH CLUSTERING ORDER BY (category_id ASC, created_at DESC, movie_id ASC);
+
+
+CREATE CUSTOM INDEX list_movies_by_names ON movie_db.movies_by_user (name) 
+  USING 'StorageAttachedIndex' 

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -159,7 +160,7 @@ func (c *MovieController) fetchMovies(userID, categoryID gocql.UUID) ([]*pb.Movi
 	return movies, nil
 }
 
-func (c *MovieController) GetMoviesByUserIDOnly(req *pb.GetMoviesRequestByUserIDOnly, stream pb.MovieService_GetMoviesByUserIDServer) error {
+func (c *MovieController) GetMoviesByUserID(req *pb.GetMoviesRequestByUserIDOnly, stream pb.MovieService_GetMoviesByUserIDServer) error {
 	if req.UserId == "" {
 		return status.Errorf(codes.InvalidArgument, "userId cannot be empty")
 	}
@@ -176,6 +177,8 @@ func (c *MovieController) GetMoviesByUserIDOnly(req *pb.GetMoviesRequestByUserID
 	stmt := `SELECT movie_id, category_id, name, banner_url, movie_url, description, created_at, updated_at 
 			FROM movie_db.movies_by_user 
 			WHERE user_id = ?`
+
+	// todo remeber to set the name as a secondary index local
 	query := c.session.Query(stmt, userID).PageSize(int(req.PageSize))
 	if len(req.PagingState) > 0 {
 		query = query.PageState(req.PagingState)
@@ -221,4 +224,74 @@ func (c *MovieController) GetMoviesByUserIDOnly(req *pb.GetMoviesRequestByUserID
 
 	return nil
 
+}
+
+func (c *MovieController) GetMoviesByUserIDAndName(req *pb.GetMoviesRequestByUserIDAndName, stream pb.MovieService_GetMoviesByUserIDAndNameServer) error {
+	// Validate input
+	if req.UserId == "" || req.Name == "" {
+		return status.Errorf(codes.InvalidArgument, "userId and name cannot be empty")
+	}
+
+	if req.PageSize <= 0 {
+		return status.Errorf(codes.InvalidArgument, "pageSize must be greater than 0")
+	}
+
+	userID, err := gocql.ParseUUID(req.UserId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid userId format: %v", err)
+	}
+
+	// Prepare query
+	stmt := `SELECT movie_id, category_id, banner_url, movie_url, description, created_at, updated_at FROM movie_db.movies_by_user WHERE user_id = ? AND name = ?`
+	query := c.session.Query(stmt, userID, req.Name).PageSize(int(req.PageSize))
+	if len(req.PagingState) > 0 {
+		query = query.PageState(req.PagingState)
+	}
+
+	// Execute query
+	iter := query.Iter()
+	var (
+		movies      []*pb.MovieResponse
+		movieID     gocql.UUID
+		categoryID  gocql.UUID
+		bannerURL   string
+		movieURL    string
+		description string
+		createdAt   time.Time
+		updatedAt   time.Time
+	)
+
+	for iter.Scan(&movieID, &categoryID, &bannerURL, &movieURL, &description, &createdAt, &updatedAt) {
+		movies = append(movies, &pb.MovieResponse{
+			UserId:      userID.String(),
+			MovieId:     movieID.String(),
+			CategoryId:  categoryID.String(),
+			Name:        req.Name,
+			BannerUrl:   bannerURL,
+			MovieUrl:    movieURL,
+			Description: description,
+			CreatedAt:   timestamppb.New(createdAt),
+			UpdatedAt:   timestamppb.New(updatedAt),
+		})
+	}
+
+	if err := iter.Close(); err != nil {
+		slog.Error("failed to close the iterator", "error", err)
+		return status.Errorf(codes.Internal, "failed to close iterator: %v", err)
+	}
+
+	nextPagingState := iter.PageState()
+
+	// Send response
+	response := &pb.GetMoviesResponseByUserIDAndName{
+		Movies:      movies,
+		Message:     "Movies processed successfully",
+		PagingState: nextPagingState,
+	}
+
+	if err := stream.Send(response); err != nil {
+		return status.Errorf(codes.Internal, "failed to send response: %v", err)
+	}
+
+	return nil
 }
